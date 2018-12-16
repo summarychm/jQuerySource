@@ -262,10 +262,6 @@
       if (jQuery.fn.trigger) //触发ready事件回调后,再删除该事件.
         jQuery(document).trigger("ready").off("ready");
     },
-
-    // See test/unit/core.js for details concerning isFunction.
-    // Since version 1.3, DOM methods and functions like alert
-    // aren't supported. They return false on IE (#2968).
     isFunction: function (obj) {
       return jQuery.type(obj) === "function";
     },
@@ -273,90 +269,57 @@
     isWindow: function (obj) {
       return obj != null && obj === obj.window;
     },
-    isNumeric: function (obj) {
+    isNumeric: function (obj) { //是数字且是有效的数字
       return !isNaN(parseFloat(obj)) && isFinite(obj);
     },
-    type: function (obj) {
-      if (obj == null) {
+    type: function (obj) { // 使用toString.call()来判断数据类型
+      if (obj == null) // null/undefined
         return String(obj);
-      }
       // Support: Safari <= 5.1 (functionish RegExp)
       return typeof obj === "object" || typeof obj === "function" ?
         class2type[core_toString.call(obj)] || "object" :
         typeof obj;
     },
-
-    isPlainObject: function (obj) {
-      // Not plain objects:
-      // - Any object or value whose internal [[Class]] property is not "[object Object]"
-      // - DOM nodes
-      // - window
-      if (jQuery.type(obj) !== "object" || obj.nodeType || jQuery.isWindow(obj)) {
+    isPlainObject: function (obj) { //是否是对象字面量
+      // 类型不是object类型,DOM节点,window都不是对象字面量
+      if (jQuery.type(obj) !== "object" || obj.nodeType || jQuery.isWindow(obj))
         return false;
-      }
-
-      // Support: Firefox <20
-      // The try/catch suppresses exceptions thrown when attempting to access
-      // the "constructor" property of certain host objects, ie. |window.location|
-      // https://bugzilla.mozilla.org/show_bug.cgi?id=814622
-      try {
-        if (obj.constructor &&
-          !core_hasOwn.call(obj.constructor.prototype, "isPrototypeOf")) {
-          return false;
-        }
-      } catch (e) {
+      // 如果原型链上没有Object独有的isPrototypeOf方法,返回false,比如window.location
+      if (obj.constructor && !core_hasOwn.call(obj.constructor.prototype, "isPrototypeOf"))
         return false;
-      }
-
-      // If the function hasn't returned already, we're confident that
-      // |obj| is a plain object, created by {} or constructed with new Object
-      return true;
+      return true; // 其他情况返回false
     },
-
-    isEmptyObject: function (obj) {
+    isEmptyObject: function (obj) { // 是否空对象
       var name;
       for (name in obj) {
         return false;
       }
       return true;
     },
-
     error: function (msg) {
       throw new Error(msg);
     },
-
-    // data: string of html
-    // context (optional): If specified, the fragment will be created in this context, defaults to document
-    // keepScripts (optional): If true, will include scripts passed in the html string
+    // 要解析的html,要创建到的上下文,是否加载script标签
     parseHTML: function (data, context, keepScripts) {
-      if (!data || typeof data !== "string") {
-        return null;
-      }
-      if (typeof context === "boolean") {
+      // 不是字符串,直接return null
+      if (!data || typeof data !== "string") return null;
+      if (typeof context === "boolean") { // 只有2个参数的情况
         keepScripts = context;
         context = false;
       }
       context = context || document;
-
-      var parsed = rsingleTag.exec(data),
-        scripts = !keepScripts && [];
-
-      // Single tag
-      if (parsed) {
-        return [context.createElement(parsed[1])];
-      }
-
+      var parsed = rsingleTag.exec(data), //判断是否是单标签的情况
+        scripts = !keepScripts && []; //判断是否要复制script标签
+      // 单标签 直接用原生创建该标签,并把该标签以数组形式返回.
+      if (parsed) return [context.createElement(parsed[1])];
+      // 处理多标签,将script标签存入scripts中.
       parsed = jQuery.buildFragment([data], context, scripts);
-
-      if (scripts) {
-        jQuery(scripts).remove();
-      }
-
+      //如果scripts有值,则直接删除掉这些script标签
+      if (scripts) jQuery(scripts).remove();
+      //将dom节点转为数组,以后再通过jQuery.merge与jq实例合并,就会合并到jq实例上.
       return jQuery.merge([], parsed.childNodes);
     },
-
     parseJSON: JSON.parse,
-
     // Cross-browser xml parsing
     parseXML: function (data) {
       var xml, tmp;
