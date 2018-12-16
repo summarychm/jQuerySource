@@ -1,7 +1,7 @@
 (function (window, undefined) {
   var
     rootjQuery, //存储根节点 jQuery(document)
-    readyList, // The deferred used on DOM ready
+    readyList, // 缓存DOM加载完成时的Promise延迟对象
     // For `typeof xmlNode.method` instead of `xmlNode.method !== undefined`
     core_strundefined = typeof undefined, //兼容<=IE9的的xmlNode的 undefined判断
     // Use the correct document accordingly with window argument (sandbox)
@@ -29,27 +29,21 @@
       // 将jQuery的原型赋值给jQuery.prototype.init的原型,
       // 这样new jQuery()时就可以链式调用jQuery.prototype上的方法了.
     },
-
-    // Used for matching numbers
     core_pnum = /[+-]?(?:\d*\.|)\d+(?:[eE][+-]?\d+|)/.source, // 匹配数字
-    // Used for splitting on whitespace
     core_rnotwhite = /\S+/g, // 匹配空白
     rquickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]*))$/, // 匹配只有前缀的html标签 或Id选择器.
     rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>|)$/, // 匹配空白标签
     rmsPrefix = /^-ms-/, // 微软专用前缀,用于兼容
     rdashAlpha = /-([\da-z])/gi, // 匹配"-数字xxx"的情景
-
-    // 将字符串转为大写字母 Used by jQuery.camelCase as callback to replace()
-    fcamelCase = function (all, letter) {
+    fcamelCase = function (all, letter) { // 将字符串转为大写字母
       return letter.toUpperCase();
     },
-    // jQuery拦截了浏览器自身的load事件,改为自己内部的ready事件
-    completed = function () {
+    completed = function () { // "load"和"DOMContentLoaded"的公用回调
+      // 首先删除监听函数,防止重复触发回调.
       document.removeEventListener("DOMContentLoaded", completed, false);
       window.removeEventListener("load", completed, false);
-      jQuery.ready();
+      jQuery.ready(); // 再调用jQuery.ready()处理load流程.
     };
-
   jQuery.fn = jQuery.prototype = {
     jquery: core_version, // 版本号
     constructor: jQuery, // 修正原型指向
@@ -73,8 +67,8 @@
           // match=[‘#div1’,null,’div1’]; //$(‘#div1’)
           // match=[‘<li>hello’,’<li>’,null]; // $(‘<li>hello’)
         }
-
         /******** 按照selector的类型区分(创建标签/查找元素) end ********/
+
         // 匹配selector 为创建标签或Id选择器
         if (match && (match[1] || !context)) {
           if (match[1]) {
@@ -238,54 +232,35 @@
 
   // 扩展工具方法
   jQuery.extend({
-    // uuid(内部),方便处理映射关系,如数据缓存,事件操作,ajax等
-    expando: "jQuery" + (core_version + Math.random()).replace(/\D/g, ""),
-    noConflict: function (deep) {
-      // 返回jQuery构造函数供外部变量使用,根据js的查找机制,就不会出现变量冲突的问题了.
-      if (window.$ === jQuery)
-        window.$ = _$; //将window.$放弃
-      if (deep && window.jQuery === jQuery)
-        window.jQuery = _jQuery; //如果deep 为true,则将window.jQuery也放弃.
-      return jQuery;
-    },
     // Is the DOM ready to be used? Set to true once it occurs.
     isReady: false,
     // A counter to track how many items to wait for before
     // the ready event fires. See #6781
     readyWait: 1,
-
-    // Hold (or release) the ready event
-    holdReady: function (hold) {
-      if (hold) {
-        jQuery.readyWait++;
-      } else {
-        jQuery.ready(true);
-      }
+    // uuid(内部),方便处理映射关系,如数据缓存,事件操作,ajax等
+    expando: "jQuery" + (core_version + Math.random()).replace(/\D/g, ""),
+    noConflict: function (deep) {
+      // 返回jQuery构造函数供外部变量使用,根据js的查找机制,就不会出现变量冲突的问题了.
+      if (window.$ === jQuery)
+        window.$ = _$; //将window.$释放掉,不再使用全局的$作为选择符.
+      if (deep && window.jQuery === jQuery)
+        window.jQuery = _jQuery; //如果deep 为true,则将window.jQuery也放弃.
+      return jQuery;
     },
-
-    // Handle when the DOM is ready
-    ready: function (wait) {
-
-      // Abort if there are pending holds or we're already ready
-      if (wait === true ? --jQuery.readyWait : jQuery.isReady) {
-        return;
-      }
-
-      // Remember that the DOM is ready
-      jQuery.isReady = true;
-
-      // If a normal DOM Ready event fired, decrement, and wait if need be
-      if (wait !== true && --jQuery.readyWait > 0) {
-        return;
-      }
-
-      // If there are functions bound, to execute
-      readyList.resolveWith(document, [jQuery]);
-
-      // Trigger any bound ready events
-      if (jQuery.fn.trigger) {
+    holdReady: function (hold) { //推迟(释放)DOM触发,比如用于加载js文件.
+      if (hold) jQuery.readyWait++;
+      else jQuery.ready(true);
+    },
+    ready: function (wait) { // Handle when the DOM is ready
+      // 如果还处于挂起状态,则直接return,如果为参数为空,则看isReady属性是否为true
+      if (wait === true ? --jQuery.readyWait : jQuery.isReady) return;
+      jQuery.isReady = true; // 标识DOM已经准备就绪
+      // 如果readyWait还不为0,则继续等待
+      if (wait !== true && --jQuery.readyWait > 0) return;
+      readyList.resolveWith(document, [jQuery]); //调用ready回调,并传递jquery对象.
+      //应对 $(document).on(“ready”,fn);这种小众写法
+      if (jQuery.fn.trigger) //触发ready事件回调后,再删除该事件.
         jQuery(document).trigger("ready").off("ready");
-      }
     },
 
     // See test/unit/core.js for details concerning isFunction.
@@ -294,17 +269,13 @@
     isFunction: function (obj) {
       return jQuery.type(obj) === "function";
     },
-
     isArray: Array.isArray,
-
     isWindow: function (obj) {
       return obj != null && obj === obj.window;
     },
-
     isNumeric: function (obj) {
       return !isNaN(parseFloat(obj)) && isFinite(obj);
     },
-
     type: function (obj) {
       if (obj == null) {
         return String(obj);
@@ -699,28 +670,18 @@
       return ret;
     }
   });
-
-  jQuery.ready.promise = function (obj) {
+  jQuery.ready.promise = function (obj) { //$.ready 会调用该函数来生成promise对象
     if (!readyList) {
-
-      readyList = jQuery.Deferred();
-
-      // Catch cases where $(document).ready() is called after the browser event has already occurred.
-      // we once tried to use readyState "interactive" here, but it caused issues like the one
-      // discovered by ChrisS here: http://bugs.jquery.com/ticket/12282#comment:15
-      if (document.readyState === "complete") {
-        // Handle it asynchronously to allow scripts the opportunity to delay ready
-        setTimeout(jQuery.ready);
-
-      } else {
-
-        // Use the handy event callback
+      readyList = jQuery.Deferred(); // 定义延迟对象
+      if (document.readyState === "complete") //加载完成事件
+        setTimeout(jQuery.ready); // 兼容IE,在下个事件队列中再执行jQuery.ready回调
+      else {
+        // 两者都添加监听事件,防止浏览器自己缓存load事件,保证最先触发回调
         document.addEventListener("DOMContentLoaded", completed, false);
-
-        // A fallback to window.onload, that will always work
         window.addEventListener("load", completed, false);
       }
     }
+    //将延迟对象返回
     return readyList.promise(obj);
   };
 
