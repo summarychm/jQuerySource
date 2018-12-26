@@ -115,7 +115,7 @@
         this.context = this[0] = selector; // 将传入的dom对象转为jq对象
         this.length = 1;
         return this;
-      } else if (jQuery.isFunction(selector)) //HANDLE: $(function)
+      } else if (jQuery.isFunction(selector)) //HANDLE: $(function),将其加入ready队列中
         return rootjQuery.ready(selector); // 调用ready方法,进行load绑定
 
       // 判断selector 是否是一个jq对象,如果是则将其赋值给当前jq对象.
@@ -299,7 +299,7 @@
     error: function (msg) {
       throw new Error(msg);
     },
-    // 要解析的html,要创建到的上下文,是否加载script标签
+    // 要解析的html,要创建到的上下文,是否支持加载script标签
     parseHTML: function (data, context, keepScripts) {
       // 不是字符串,直接return null
       if (!data || typeof data !== "string") return null;
@@ -314,9 +314,9 @@
       if (parsed) return [context.createElement(parsed[1])];
       // 处理多标签,将script标签存入scripts中.
       parsed = jQuery.buildFragment([data], context, scripts);
-      //如果scripts有值,则直接删除掉这些script标签
+      //如果scripts为true则不删除掉script标签及其内容,否则直接删除掉.
       if (scripts) jQuery(scripts).remove();
-      //将dom节点转为数组,以后再通过jQuery.merge与jq实例合并,就会合并到jq实例上.
+      //将dom节点转为数组并返回,(以后再通过$.merge合并到jq实例上).
       return jQuery.merge([], parsed.childNodes);
     },
     parseJSON: JSON.parse,
