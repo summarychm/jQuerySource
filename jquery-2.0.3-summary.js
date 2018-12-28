@@ -406,152 +406,146 @@
     nodeName: function (elem, name) {
       return (elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase());
     },
-
-    // args is for internal usage only
+    //遍历对象,支持数组,类数组,JSON,jq实例,参数三,args只供内部使用
+    //在遍历中可以通过return false跳出遍历.
     each: function (obj, callback, args) {
       var value,
         i = 0,
         length = obj.length,
         isArray = isArraylike(obj);
-
-      if (args) {
+      // 内部和外部两种使用方式的区别就在于更改上下文时,
+      // 外部情况参数固定,直接使用call并传递i和obj[i]即可.
+      // 内部情况参数是由外部传入的不定参,所以直接用apply,并传入args
+      if (args) { //内部使用的情况
         if (isArray) {
           for (; i < length; i++) {
             value = callback.apply(obj[i], args);
-
-            if (value === false) {
+            if (value === false)
               break;
-            }
           }
         } else {
           for (i in obj) {
             value = callback.apply(obj[i], args);
-
-            if (value === false) {
+            if (value === false)
               break;
-            }
           }
         }
-
-        // A special, fast, case for the most common use of each
-      } else {
-        if (isArray) {
+      } else { //外部用户调用的情况
+        if (isArray) { // 数组,类数组,jq实例,采用for循环处理
           for (; i < length; i++) {
-            value = callback.call(obj[i], i, obj[i]);
-
-            if (value === false) {
+            if (callback.call(obj[i], i, obj[i]) === false) // 如果返回false,直接跳出循环.
               break;
-            }
           }
-        } else {
+        } else { // JSON对象采用for in循环
           for (i in obj) {
-            value = callback.call(obj[i], i, obj[i]);
-
-            if (value === false) {
+            if (value = callback.call(obj[i], i, obj[i]) === false)
               break;
-            }
           }
         }
       }
-
       return obj;
     },
-
-    trim: function (text) {
+    trim: function (text) { // es5的string.trim()
       return text == null ? "" : core_trim.call(text);
     },
-
-    // results is for internal usage only
+    /**
+     * 将参数转为数组, 如果results有length则转为类数组.
+     * ps: results is for internal usage only(内部参数)
+     * @param {object} arr 接收对象
+     * @param {object} results 待处理对象
+     */
     makeArray: function (arr, results) {
-      var ret = results || [];
-
+      var ret = results || []; //如果有results则设置ret为results,否则设置为空数组.
       if (arr != null) {
-        if (isArraylike(Object(arr))) {
+        // 先转为Object对象(isArraylike只支持对象),再判断其是否是类数组(包含length).
+        // 如果是类数组则使用$.merge来将其追加到ret结果上(类数组)
+        if (isArraylike(Object(arr)))
           jQuery.merge(ret, typeof arr === "string" ? [arr] : arr);
-        } else {
+        else
           core_push.call(ret, arr);
-        }
       }
-
       return ret;
     },
-
+    /**
+     * 数组版indexOf(使用call,借用数组的indexOf方法)
+     * @param {any} elem 待查找的元素
+     * @param {obj} arr 待查找的对象
+     * @param {int} i 开始查找的位置
+     */
     inArray: function (elem, arr, i) {
       return arr == null ? -1 : core_indexOf.call(arr, elem, i);
     },
 
+    /**
+     * 对外合并数组, 对内转为jq实例类型(数字索引下标, length)
+     * ps:不去除只追加
+     * @param {any} first 目标对象,类数组/JSON/JQ实例
+     * @param {any} second 待处理对象
+     */
     merge: function (first, second) {
       var l = second.length,
         i = first.length,
         j = 0;
-
-      if (typeof l === "number") {
-        for (; j < l; j++) {
+      if (typeof l === "number") { //参数second是数组/类数组时
+        for (; j < l; j++) { //使用for循环追加到first上
           first[i++] = second[j];
         }
-      } else {
+      } else { //参数second是JOSN时(数据是数字下标形式的obj),使用while
         while (second[j] !== undefined) {
           first[i++] = second[j++];
         }
       }
-
-      first.length = i;
-
+      first.length = i; //修正类数组的length属性
       return first;
     },
-
+    /**
+     * 过滤返回新数组(加强版filter)
+     * @param {any} elems 要处理的对象
+     * @param {fn} callback 回调函数(item.i)
+     * @param {bool} inv 是否取反,true取反,默认false
+     */
     grep: function (elems, callback, inv) {
       var retVal,
         ret = [],
         i = 0,
         length = elems.length;
       inv = !!inv;
-
-      // Go through the array, only saving the items
-      // that pass the validator function
       for (; i < length; i++) {
-        retVal = !!callback(elems[i], i);
-        if (inv !== retVal) {
+        retVal = !!callback(elems[i], i); //根据处理函数的返回值来判读是否符合返回条件
+        if (inv !== retVal) //根据是否取反,添加待返回数据.
           ret.push(elems[i]);
-        }
       }
-
       return ret;
     },
 
     // arg is for internal usage only
+    /**
+     * 将集合映射为新集合
+     * @param {any} elems 待处理集合
+     * @param {fn} callback 映射函数
+     * @param {any} arg 待传入映射函数的参数(内部参数)
+     */
     map: function (elems, callback, arg) {
       var value,
         i = 0,
         length = elems.length,
-        isArray = isArraylike(elems),
         ret = [];
-
-      // Go through the array, translating each of the items to their
-      if (isArray) {
+      if (isArraylike(elems)) { //待处理集合为类数组(数组,类数组,jq实例,for循环)
         for (; i < length; i++) {
-          value = callback(elems[i], i, arg);
-
-          if (value != null) {
-            ret[ret.length] = value;
-          }
+          value = callback(elems[i], i, arg); //递归调用映射函数,可传入args
+          if (value != null) //将将非空结果保存到ret中
+            ret[ret.length] = value; //使用ret.length,每次累加完会自动增大,很巧妙
         }
-
-        // Go through every key on the object,
-      } else {
+      } else { //处理对象类型JSON(for in)
         for (i in elems) {
           value = callback(elems[i], i, arg);
-
-          if (value != null) {
+          if (value != null)
             ret[ret.length] = value;
-          }
         }
       }
-
-      // Flatten any nested arrays
+      //返回一个新数组,(之所以借用concat是不项返回二维数组,进行降维处理,很巧妙)
       return core_concat.apply([], ret);
     },
-
     // A global GUID counter for objects
     guid: 1,
 
